@@ -8,5 +8,4 @@ We are building a tool that automatically processes images from books. Our syste
 
 Using advanced deep learning techniques, we aim to make historical and printed book images more accessible and usable.  
 
-This project will help researchers, libraries, and digital archives extract and analyze visual content effortlessly. 🚀  
-
+This project will help researchers, libraries, and digital archives extract and analyze visual content effortlessly. 
