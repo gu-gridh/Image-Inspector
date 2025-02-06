@@ -30,7 +30,8 @@ def create_dataset(dataset_path):
     dataset = fo.Dataset.from_dir(
         dataset_type=fo.types.ImageDirectory,
         dataset_dir=dataset_path,
-        name="my-dataset"
+        name="my-dataset",
+        overwrite=True, #Handle error you'll get if a dataset with name already exists
     )
     return dataset
 
