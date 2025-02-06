@@ -1,0 +1,17 @@
+name: image-extractor-env
+channels:
+  - conda-forge
+  - anaconda
+  - defaults
+dependencies:
+  - python=3.12
+  - fastai
+  - albumentations
+  - opencv
+  - numpy
+  - pandas
+  - pip
+  - pip:
+    - tensorboard
+    - fiftyone
+    - fiftyone-brain
