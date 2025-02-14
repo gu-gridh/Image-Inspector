@@ -15,3 +15,7 @@ dependencies:
     - tensorboard
     - fiftyone
     - fiftyone-brain
+    - fastapi
+    - timm
+    - uvicorn
+    - python-multipart

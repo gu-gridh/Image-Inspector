@@ -1,26 +1,10 @@
-from fastapi import FastAPI, File, UploadFile
 from torchvision import transforms
 from PIL import Image
 import torch
 import timm
-import io
 import csv
-import argparse
 import os
 import fiftyone as fo
-
-# Initialize FastAPI app
-app = FastAPI()
-
-# Function to parse command-line arguments
-def parse_arguments():
-    parser = argparse.ArgumentParser(description="Process images and extract features using FastAPI.")
-    parser.add_argument("--dataset_path", help="Path to dataset if images are stored as a dataset.")
-    parser.add_argument("--dataset_name", help="Name of the dataset to load.")
-    parser.add_argument("--input_image", help="Path to the input image.")
-    parser.add_argument("--csv_file", help="Path to the CSV file containing image file paths.")
-    parser.add_argument("--model", default="vit_base_patch16_224", help="The model to use for feature extraction.")
-    return parser.parse_args()
 
 # Create dataset if it doesn't exist already
 def create_dataset(dataset_path):
@@ -65,25 +49,6 @@ def save_features(image_path, features, output_file="features.csv"):
         writer = csv.writer(file)
         writer.writerow([image_path] + features)
 
-@app.post("/extract_features/")
-async def extract_features(file: UploadFile = File(...), model_name: str = "vit_base_patch16_224"):
-    global model
-    if model_name != model.default_cfg["architecture"]:
-        model = load_model(model_name)
-    
-    # Read image
-    image = Image.open(io.BytesIO(await file.read())).convert("RGB")
-    image = transform(image).unsqueeze(0)
-
-    # Extract features
-    with torch.no_grad():
-        features = model(image).squeeze().tolist()
-
-    # Save to CSV
-    save_features(file.filename, features)
-
-    return {"message": f"Features saved for {file.filename}"}
-
 # Function to process images from CSV and save features
 def process_images(csv_file, model_name):
     with open(csv_file, 'r') as file:
@@ -122,31 +87,3 @@ def compute_embeddings(dataset, model, output_file="dataset_features.csv"):
             
             writer.writerow([image_path] + features)
             print(f"Processed: {image_path}")
-
-if __name__ == "__main__":
-    args = parse_arguments()
-
-    # Process dataset if provided
-    if args.dataset_path or args.dataset_name:
-        dataset = create_dataset(args.dataset_path) or load_dataset(args.dataset_name)
-        if dataset:
-            compute_embeddings(dataset, model)
-
-    # Process images from CSV
-    elif args.csv_file:
-        process_images(args.csv_file, args.model)
-
-    # Process a single image
-    elif args.input_image:
-        image_path = args.input_image
-        if os.path.exists(image_path):
-            image = Image.open(image_path).convert("RGB")
-            image = transform(image).unsqueeze(0)
-
-            with torch.no_grad():
-                features = model(image).squeeze().tolist()
-            
-            save_features(image_path, features)
-            print(f"Features saved for {image_path}")
-        else:
-            print("Input image not found!")
