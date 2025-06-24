@@ -5,16 +5,28 @@ import timm
 import csv
 import os
 import fiftyone as fo
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+
+
+# Increase the pixel limit
+Image.MAX_IMAGE_PIXELS = 1000000000  # Example: 1 billion pixels
+# Image transformations
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
 
 # Create dataset if it doesn't exist already
-def create_dataset(dataset_path):
+def create_dataset(dataset_path, dataset_name):
     if not os.path.exists(dataset_path):
         print("Dataset path does not exist!")
         return None
     dataset = fo.Dataset.from_dir(
         dataset_type=fo.types.ImageDirectory,
         dataset_dir=dataset_path,
-        name="my-dataset",
+        name=dataset_name,
         overwrite=True, #Handle error you'll get if a dataset with name already exists
     )
     return dataset
@@ -33,15 +45,6 @@ def load_model(model_name: str = "vit_base_patch16_224"):
     model.eval()
     return model
 
-# Image transformations
-transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-])
-
-# Load default model
-model = load_model()
 
 # Save extracted features to a CSV file
 def save_features(image_path, features, output_file="features.csv"):
@@ -50,8 +53,8 @@ def save_features(image_path, features, output_file="features.csv"):
         writer.writerow([image_path] + features)
 
 # Function to process images from CSV and save features
-def process_images(csv_file, model_name):
-    with open(csv_file, 'r') as file:
+def process_images(path, model_name):
+    with open(path, 'r') as file:
         reader = csv.reader(file)
         for row in reader:
             image_path = row[0]
@@ -59,6 +62,8 @@ def process_images(csv_file, model_name):
                 print(f"Image path {image_path} does not exist, skipping.")
                 continue
 
+            # Load default model
+            model = load_model()
             # Load and transform image
             image = Image.open(image_path).convert("RGB")
             image = transform(image).unsqueeze(0)
@@ -86,4 +91,4 @@ def compute_embeddings(dataset, model, output_file="dataset_features.csv"):
                 features = model(image).squeeze().tolist()
             
             writer.writerow([image_path] + features)
-            print(f"Processed: {image_path}")
+            # print(f"Processed: {image_path}")

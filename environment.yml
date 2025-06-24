@@ -8,7 +8,7 @@ dependencies:
   - fastai
   - albumentations
   - opencv
-  - numpy
+  - numpyßß
   - pandas
   - pip
   - pip:
@@ -19,3 +19,13 @@ dependencies:
     - timm
     - uvicorn
     - python-multipart
+    - transformers
+    - accelerate
+    - torch
+    - torchvision
+    - torchaudio
+    - umap-learn
+    - open_clip_torch
+    - scikit-learn
+
+    

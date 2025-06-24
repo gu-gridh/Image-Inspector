@@ -10,6 +10,10 @@ import argparse
 import fiftyone as fo
 from torchvision import transforms
 import fiftyone.brain as fob
+from fiftyone.brain import compute_similarity
+
+# Increase the pixel limit
+Image.MAX_IMAGE_PIXELS = 1000000000  # Example: 1 billion pixels
 
 
 # Function to parse command-line arguments
@@ -33,30 +37,48 @@ def load_model(model_name: str = "vit_base_patch16_224"):
     model.eval()
     return model
 
-# Image transformations
-transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-])
+# Function to find nearest neighbours of a given image in the dataset
+def find_neighbours(model, dataset):
 
-# Load default model
-model = load_model()
+    brain_key = "img_sim"
 
-# Find similar images
-def find_neighbours(image_path, dataset):
-    image = Image.open(image_path)
-    image_tensor = transform(image).unsqueeze(0)
+    # 🔹 Delete existing brain run if it already exists
+    if brain_key in dataset.list_brain_runs():
+        dataset.delete_brain_run(brain_key)
+    
+    # Image transformations
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+
+    image_tensors = []
+
+    for sample in dataset:
+        image_path = sample.filepath
+        image = Image.open(image_path).convert("RGB")  # 🔹 Convert to RGB to ensure 3 channels
+
+        image_tensor = transform(image).unsqueeze(0)
+        image_tensors.append(image_tensor)
+
+    # Stack images for batch processing
+    image_batch = torch.cat(image_tensors, dim=0)
+
+    # Extract features
     with torch.no_grad():
-        features = model(image_tensor)
-    features = features.squeeze().numpy()
-    distances = fob.compute_nearest_neighbors(
+        features = model(image_batch).numpy()
+
+    # Compute similarity
+    distances = compute_similarity(
         dataset,
-        features,
-        k=5,
-        distance_metric="cosine",
-        field="features",
+        features=features,
+        brain_key="img_sim",
+        algorithm="brute_force",
+        metric="cosine",
+        overwrite=True
     )
+
     return distances
 
 # Save the results to a CSV file

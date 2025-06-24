@@ -13,7 +13,14 @@ import timm
 import os
 import fiftyone as fo
 from torchvision import transforms
+from transformers import BlipProcessor, BlipForConditionalGeneration
 
+# Image transformations
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
 
 # Create dataset if it doesn't exist already  or load it if it exists
 def create_or_load_dataset(dataset_path, dataset_name):
@@ -36,28 +43,54 @@ def load_model(model_name: str = "vit_base_patch16_224"):
     model = timm.create_model(model_name, pretrained=True, num_classes=0)  # Feature extractor
     model.eval()
     return model
+ 
+def generate_tags_clip(image_dir, tokenizer, model, candidate_tags, preprocess, top_k=3):
+    results = []
+    texts = tokenizer(candidate_tags)
+    text_features = model.encode_text(texts).detach()
 
-# Image transformations
-transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-])
+    for image_name in os.listdir(image_dir):
+        if not image_name.lower().endswith(('.jpg', '.jpeg', '.png')):
+            continue
+        image_path = os.path.join(image_dir, image_name)
+        try:
+            image = Image.open(image_path).convert("RGB")
+        except:
+            continue
 
-# Load default model
-model = load_model()
+        image_input = preprocess(image).unsqueeze(0)
+        with torch.no_grad():
+            image_features = model.encode_image(image_input)
 
-# Generate tags for an image
-def generate_tags(image_path):
-    image = Image.open(image_path)
-    image_tensor = transform(image).unsqueeze(0)
-    with torch.no_grad():
-        features = model(image_tensor)
-    features = features.squeeze().numpy()
-    # Perform some processing to generate tags
-    tags = ["tag1", "tag2", "tag3"]
+            similarity = (image_features @ text_features.T).squeeze(0)
+            top_tags = torch.topk(similarity, k=top_k).indices
+            tags = [candidate_tags[i] for i in top_tags]
+            results.append((image_name, tags))
+
+    return results
+
+
+
+def generate_tags_blip(image_dir, processor, model):
+    tags = []
+    for image_name in os.listdir(image_dir):
+        if not image_name.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.tiff')):
+            continue
+
+        image_path = os.path.join(image_dir, image_name)
+        try:
+            image = Image.open(image_path).convert("RGB")
+        except Exception as e:
+            print(f"Skipping {image_name}: {e}")
+            continue
+
+        inputs = processor(image, return_tensors="pt")
+        with torch.no_grad():
+            output = model.generate(**inputs)
+            caption = processor.decode(output[0], skip_special_tokens=True)
+            tags.append((image_name, caption))
+
     return tags
-
 
 
 #  The tag_generator.py module is responsible for generating tags for images based on the features extracted by the model.
